@@ -1,0 +1,6 @@
+# build output
+dots_and_boxes
+test_bot
+test_logic
+*.exe
+*.o

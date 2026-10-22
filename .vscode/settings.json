@@ -60,6 +60,9 @@
     "math.h": "c",
     "stdbool.h": "c",
     "time.h": "c",
-    "game.h": "c"
+    "game.h": "c",
+    "random": "c",
+    "stdio.h": "c",
+    "string.h": "c"
   }
 }

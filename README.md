@@ -1,192 +1,93 @@
-# Dots and Boxes — C Implementation with Bot AI
+<div align="center">
 
-A terminal-based implementation of the classic **Dots and Boxes** game, written in **C**, featuring modular game logic, robust move validation, and multiple AI difficulty levels. The project emphasizes **clean state management**, **rule correctness**, and **algorithmic decision-making**, making it both a playable game and a solid systems-level programming exercise.
+<img src="docs/assets/banner.png" alt="Dots & Boxes: a terminal game in C with Easy, Medium and Hard bots" width="100%">
 
----
+<br>
 
-## Overview
+![C](https://img.shields.io/badge/C-pthreads-58a6ff?style=for-the-badge&labelColor=0d1117)
+![Hard bot](https://img.shields.io/badge/Hard_bot-minimax_%2B_alpha--beta-ff7b72?style=for-the-badge&labelColor=0d1117)
+![Tests](https://img.shields.io/badge/Tests-make_test-3fb950?style=for-the-badge&labelColor=0d1117)
 
-Dots and Boxes is a turn-based strategy game where players take turns drawing lines between adjacent dots. Completing the fourth side of a box claims it for the current player and grants an extra turn. The game ends when all boxes are claimed, and the player with the highest score wins.
+**Play Dots and Boxes in your terminal against a bot you can turn up from random to ruthless.**
 
-This implementation supports:
+</div>
 
-* **Human vs Human**
-* **Human vs Bot (Easy)**
-* **Human vs Bot (Medium)**
-* **Human vs Bot (Hard)**
+<br>
 
-The project is structured to separate **game state**, **core logic**, and **AI behavior**, keeping the codebase clean, extensible, and easy to reason about.
+<div align="center">
+<img src="docs/assets/game.png" alt="A finished game in the terminal: Medium (Player A) against Hard (Player B), Hard wins 13 to 7" width="560">
+<br>
+<sub>A real game from this code: Medium (A, blue) against Hard (B, red). Hard wins 13 to 7.</sub>
+</div>
 
----
+## 🎮 How to play
 
-## Core Concepts & Design
+```bash
+make run
+```
 
-### Game State Management
+Pick a mode, then pick who moves first. You are **Player A** (blue), the bot is **Player B** (red).
 
-The entire game is driven by a single `GameState` struct that encapsulates:
+| Mode | Opponent |
+|---|---|
+| `1` | Another human |
+| `2` | Bot, Easy |
+| `3` | Bot, Medium |
+| `4` | Bot, Hard |
 
-* Horizontal and vertical line occupancy
-* Box ownership
-* Current player
-* Player scores
-* Remaining unclaimed boxes
-* A printable ASCII board representation
+Enter a move as the row and column of two **adjacent dots**, for example `0 0 0 1`. Type `exit` to quit.
 
-This centralized state model enables:
+Closing the fourth side of a box claims it and gives you another turn. One line can close two boxes at once. The board is 4 × 5 boxes, and the player with the most boxes wins.
 
-* Deterministic gameplay
-* Reliable rule enforcement
-* Safe state simulation for AI evaluation
+## 🤖 The bots
 
-### Move Validation Pipeline
+| Bot | How it plays |
+|---|---|
+| **Easy** | Picks a random legal line. |
+| **Medium** | Tries every legal line on a copy of the board, plays the one that completes the most boxes, and falls back to a random line if none completes a box. The search is split across **two pthreads**, one scanning horizontal lines and one scanning vertical lines, with a mutex guarding the shared best move. |
+| **Hard** | Plays like Medium for the first 20 of the 49 moves, where the branching is too wide to search. After that it runs a **depth-5 minimax with alpha-beta pruning**, scoring positions by the score difference. The search follows the extra-turn rule: the turn only passes to the other player when no box was completed. |
 
-Every move passes through a strict validation process:
+The team tried threading the minimax search first, then went back to a single-threaded Hard bot because it ran faster.
 
-1. **Adjacency check** — only adjacent dots are allowed
-2. **Orientation detection** — horizontal vs vertical
-3. **Bounds validation**
-4. **Collision detection** — prevents overwriting existing lines
+## 🛠️ Build and test
 
-The `process_move` function enforces these rules and updates both:
+```bash
+make          # build ./dots_and_boxes
+make run      # build and play
+make test     # unit tests for the rules and the bots
+```
 
-* The logical representation (`horizontal_lines`, `vertical_lines`)
-* The printable board (`board`)
+Needs `gcc` and POSIX threads. Built and tested on Linux. Without `make`:
 
-### Box Detection & Turn Logic
+```bash
+gcc -pthread dots_and_boxes.c Logic.c Bot.c -o dots_and_boxes -lm
+```
 
-After every valid line placement:
-
-* Adjacent boxes are checked for completion
-* Boxes can be claimed **simultaneously** (important edge case)
-* Scores are updated
-* The current player only switches if **no box was completed**
-
-This guarantees full compliance with standard Dots and Boxes rules.
-
----
-
-## Bot AI Design
-
-### Easy Bot
-
-* Selects random valid moves
-* Useful for testing game flow and interaction
-* No strategic awareness
-
-### Medium Bot (Greedy Heuristic)
-
-* Simulates all possible valid moves
-* Evaluates how many boxes each move would complete
-* Selects the move that maximizes immediate box gain
-* Falls back to random play if no scoring move exists
-
-Key technique:
-
-* Uses **pass-by-value state simulation** to avoid mutating the real game state during evaluation.
-
-This demonstrates foundational AI concepts such as:
-
-* Lookahead through simulation
-* Heuristic evaluation
-* Decision-making under constraints
-
-### Hard Bot (Minimax + Alpha-Beta Pruning)
-
-* Uses a **depth-limited minimax algorithm** to evaluate future game states
-* Applies **alpha-beta pruning** to reduce the search space and improve performance
-* Correctly models Dots and Boxes rules where **completing a box grants an extra turn**
-* Player turns in the search tree only switch if **no box is completed**
-* Evaluates positions using a score-difference heuristic:
-
-  * `Player 2 score − Player 1 score`
-* Employs a **hybrid strategy**:
-
-  * Falls back to the Medium bot’s greedy heuristic in early-game states with high branching factor
-  * Switches to full minimax search as the board becomes more constrained
-
-Key techniques demonstrated:
-
-* Recursive game-tree search
-* Alpha-beta pruning for performance optimization
-* Rule-aware turn handling inside minimax
-* Combination of heuristic-based and search-based AI decision making
-
----
-
-## Project Structure
+## 🧱 Under the hood
 
 ```
 .
-├── DotsAndBoxes.c   # Program entry point & game loop
-├── Logic.c          # Core game rules, box handling, scoring
-├── Bot.c            # AI logic (Easy, Medium & Hard bots)
-├── game.h           # Shared definitions, structs, and prototypes
-└── README.md
+├── dots_and_boxes.c   # menu and game loop
+├── Logic.c            # rules, move validation, box claiming, board printing
+├── Bot.c              # Easy, Medium (threaded) and Hard (minimax) bots
+├── game.h             # shared types, constants and prototypes
+├── test_logic.c       # unit tests for the rules
+├── test_bot.c         # unit tests for the bots
+└── Makefile
 ```
 
----
+- **One `GameState` struct** holds the lines, box owners, scores, whose turn it is and the printable board.
+- **Every move is validated** for adjacency, orientation, bounds and whether the line is already taken, and each failure returns its own error code.
+- **Bots never touch the real game while thinking.** They simulate on a copy of the state passed by value.
 
-## Build & Run
+Board size and search depth are `#define`s in `game.h` (`ROWS`, `COLS`, `MAX_DEPTH`).
 
-### Requirements
+<br>
 
-* GCC (or any C99-compatible compiler)
-* Standard C library
+<div align="center">
 
-### Compile
+**Team:** Ameera Albahrani · Hashem Awad · Ahmad Faleh · Mazen Hachem
 
-```
-gcc DotsAndBoxes.c Logic.c Bot.c -o dots_and_boxes
-```
+<sub>Forked from <a href="https://github.com/ameerabahrani/3askar-Multi-threaded-Dots-And-Boxes-Game">ameerabahrani/3askar-Multi-threaded-Dots-And-Boxes-Game</a></sub>
 
-### Run
-
-```
-./dots_and_boxes
-```
-
----
-
-## Gameplay Instructions
-
-* Choose a game mode at launch
-* Enter moves using four integers: `r1 c1 r2 c2` (two adjacent dots)
-* Example move: `0 0 0 1`
-* Type `exit` at any prompt to quit
-
-Board legend:
-
-* `.` = dot
-* `-` = horizontal line
-* `|` = vertical line
-* `A` / `B` = claimed boxes
-
----
-
-## Notable Technical Highlights
-
-* Deterministic game engine with no global state
-* Clean separation between logic, I/O, and AI
-* Defensive programming with explicit error codes
-* Simulation-based AI without side effects
-* **Hard bot implemented using minimax with alpha-beta pruning and rule-correct extra-turn handling**
-* Easily extensible to larger boards or stronger AI
-
----
-
-## Possible Extensions
-
-* Smarter bot using minimax or chain detection
-* Dynamic board sizes
-* Multiplayer over network sockets
-* GUI frontend (SDL / ncurses)
-* Performance benchmarking of AI strategies
-
----
-
-## Contributors
-
-* **Ameera Albahrani**
-* **Hashem Awad**
-* **Ahmad Faleh**
-* **Mazen Hachem**
+</div>
